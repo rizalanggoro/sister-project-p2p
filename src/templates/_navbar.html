@@ -1,0 +1,77 @@
+<div class="navbar bg-base-100 shadow-sm sticky top-0 z-30 w-full">
+  <div
+    class="container mx-auto max-w-5xl flex items-center justify-between py-0"
+    x-data="{
+      peerName: localStorage.getItem('peerName') || '{{ peer_name }}',
+      showModal: false,
+      newName: '',
+      openModal() {
+        this.newName = this.peerName;
+        this.showModal = true;
+        this.$nextTick(() => {
+          this.$refs.peerNameInput.focus();
+        });
+      },
+      saveName() {
+        if (this.newName.trim()) {
+          this.peerName = this.newName.trim();
+          localStorage.setItem('peerName', this.peerName);
+          this.showModal = false;
+        }
+      }
+    }"
+  >
+    <div class="flex-1">
+      <label for="peer-drawer" class="btn btn-square btn-ghost mr-2">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 6h16M4 12h16M4 18h16"
+          />
+        </svg>
+      </label>
+      <a class="btn btn-ghost text-xl">Sister P2P Chat</a>
+    </div>
+    <div class="flex-none flex items-center gap-4">
+      <span class="text-sm text-gray-700">
+        Peer:
+        <span class="font-semibold text-primary" x-text="peerName"></span> ({{
+        peer_host }}:{{ peer_port }})
+      </span>
+      <button class="btn" @click="openModal()">Ubah Nama</button>
+      <template x-if="showModal">
+        <div class="modal modal-open" @keydown.escape.window="showModal=false">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg mb-2">Ubah Nama Peer</h3>
+            <fieldset class="fieldset w-full mb-4">
+              <legend class="fieldset-legend">Nama Peer</legend>
+              <input
+                x-ref="peerNameInput"
+                type="text"
+                placeholder="Masukkan nama peer"
+                class="input w-full ring-0 focus:outline-none"
+                x-model="newName"
+                @keyup.enter="saveName()"
+              />
+            </fieldset>
+            <div class="modal-action">
+              <button class="btn btn-primary" @click="saveName()">
+                Simpan
+              </button>
+              <button class="btn" @click="showModal=false">Batal</button>
+            </div>
+          </div>
+          <div class="modal-backdrop" @click="showModal=false"></div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>

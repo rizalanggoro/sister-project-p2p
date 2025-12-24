@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>P2P Messaging</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@5"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+      defer
+    ></script>
+  </head>
+  <body
+    x-data="{
+    selectedPeers: [],
+    text: '',
+    chat: [],
+    loading: false,
+    async sendMessage() {
+      if (this.selectedPeers.length === 0 || !this.text.trim()) {
+        return;
+      }
+      this.loading = true;
+      try {
+        const now = Date.now() / 1000;
+        const peerName = localStorage.getItem('peerName');
+        const msg = {
+          from: peerName,
+          text: this.text,
+          timestamp: now,
+          outgoing: true
+        };
+        for (const peer of this.selectedPeers) {
+          const [host, port] = peer.split(':');
+          await fetch('/send_message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ host, port, text: this.text, name: peerName })
+          });
+        }
+        this.chat.push(msg);
+        this.text = '';
+        this.sortChat();
+      } catch (e) {
+        console.error('Error sending message:', e);
+      } finally {
+        this.loading = false;
+      }
+    },
+    sortChat() {
+      this.chat.sort((a, b) => a.timestamp - b.timestamp);
+      this.$nextTick(() => {
+        const chatArea = document.getElementById('chatArea');
+        if (chatArea) {
+          chatArea.scrollTop = chatArea.scrollHeight;
+        }
+      });
+    },
+    init() {
+      const peerName = localStorage.getItem('peerName');
+      if (peerName) {
+        const el = document.getElementById('peerNameStatus');
+        if (el) el.textContent = peerName;
+      }
+      window.addEventListener('peername-updated', (e) => {
+        const el = document.getElementById('peerNameStatus');
+        if (el) el.textContent = e.detail;
+      });
+      fetch('/messages').then(r => r.json()).then(data => {
+        this.chat = data.map(m => ({...m, outgoing: m.outgoing === true}));
+        this.sortChat();
+      });
+      const socket = io();
+      socket.on('new_message', msg => {
+        if (!this.chat.some(m => m.timestamp === msg.timestamp)) {
+          this.chat.push({...msg, outgoing: false});
+          this.sortChat();
+        }
+      });
+    }
+  }"
+    x-init="init()"
+  >
+    {% include '_navbar.html' %}
+    <div class="flex flex-col w-full max-w-2xl mx-auto">
+      <div class="drawer">
+        <input id="peer-drawer" type="checkbox" class="drawer-toggle" />
+        <div class="drawer-content"></div>
+        <div class="drawer-side">
+          <label
+            for="peer-drawer"
+            aria-label="close sidebar"
+            class="drawer-overlay"
+          ></label>
+          <ul
+            x-data=""
+            class="menu p-4 w-80 min-h-full bg-base-100 text-base-content mt-16"
+          >
+            <li class="menu-title">Daftar Peers</li>
+            {% for peer in peers %}
+            <li>
+              <label class="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  :value="'{{ peer.host }}:{{ peer.port }}'"
+                  x-model="selectedPeers"
+                  class="checkbox checkbox-primary checkbox-sm"
+                />
+                <span class="font-mono">{{ peer.host }}:{{ peer.port }}</span>
+              </label>
+            </li>
+            {% endfor %} {% if peers|length == 0 %}
+            <li><i>Tidak ada peer lain.</i></li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+      <div class="w-full">
+        <div
+          class="flex flex-col h-full"
+          style="max-height: calc(100vh - 4rem)"
+        >
+          <div id="chatArea" class="flex-1 overflow-y-auto pr-2 py-4">
+            <ul>
+              <template x-for="msg in chat">
+                <div
+                  :class="msg.outgoing ? 'chat chat-end' : 'chat chat-start'"
+                >
+                  <div class="chat-header flex items-center gap-2 mb-1">
+                    <span class="font-bold" x-text="msg.from"></span>
+                    <span
+                      class="text-xs text-gray-400"
+                      x-text="new Date(msg.timestamp * 1000).toLocaleString()"
+                    ></span>
+                  </div>
+                  <div
+                    :class="msg.outgoing ? 'chat-bubble chat-bubble-neutral' : 'chat-bubble'"
+                  >
+                    <span x-text="msg.text"></span>
+                  </div>
+                </div>
+              </template>
+              <template x-if="chat.length === 0">
+                <li><i>Belum ada pesan.</i></li>
+              </template>
+            </ul>
+          </div>
+          <div class="flex items-end gap-2 w-full mx-auto">
+            <input
+              x-model="text"
+              @keyup.enter="sendMessage()"
+              class="input input-bordered flex-1"
+              placeholder="Tulis pesan..."
+            />
+            <button
+              type="button"
+              @click="sendMessage()"
+              class="btn btn-primary flex items-center justify-center"
+              :disabled="loading || selectedPeers.length === 0 || !text.trim()"
+            >
+              <template x-if="loading">
+                <span class="loading loading-spinner loading-xs mr-2"></span>
+              </template>
+              Kirim
+            </button>
+          </div>
+          <div class="text-xs text-gray-500 my-2 ml-2">
+            Kirim ke <span x-text="selectedPeers.length"></span> penerima
+            <template x-if="selectedPeers.length > 0">
+              <span
+                >(
+                <span x-text="selectedPeers.join(', ')"></span>
+                )
+              </span>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  </body>
+</html>
